@@ -11,11 +11,11 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #333;
+    color: #ffffff;
 }
 
 .container {
-    background: white;
+    background: rgb(0, 0, 0);
     border-radius: 15px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     max-width: 1200px;
