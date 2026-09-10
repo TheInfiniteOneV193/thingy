@@ -54,13 +54,13 @@ body {
 
 .stat .label {
     font-size: 0.9em;
-    color: #999;
+    color: #daffff;
     font-weight: bold;
 }
 
 .stat .value {
     font-size: 1.5em;
-    color: #667eea;
+    color: #92a6ff;
     font-weight: bold;
 }
 
@@ -80,12 +80,12 @@ body {
 }
 
 #bossCanvas {
-    border: 5px solid #764ba2;
+    border: 5px solid #ba76ff;
     border-radius: 10px;
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: linear-gradient(135deg, #ff0000 0%, #000000 100%);
     cursor: pointer;
     transition: transform 0.1s;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 30px rgb(255, 2, 2);
 }
 
 #bossCanvas:hover {
@@ -110,12 +110,12 @@ body {
     background: #ddd;
     border-radius: 15px;
     overflow: hidden;
-    border: 2px solid #333;
+    border: 2px solid #ffffff;
 }
 
 .hp-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    background: linear-gradient(90deg, #af4c4c, #c34a4a);
     width: 100%;
     transition: width 0.3s ease;
 }
@@ -123,7 +123,7 @@ body {
 #hpText {
     font-weight: bold;
     font-size: 1.1em;
-    color: #333;
+    color: #ffffff;
 }
 
 #popupContainer {
@@ -168,7 +168,7 @@ body {
 
 .upgrade-panel,
 .prestige-panel {
-    background: #f5f5f5;
+    background: #000000;
     border-radius: 10px;
     padding: 20px;
     border: 2px solid #667eea;
@@ -188,8 +188,8 @@ body {
 }
 
 .upgrade {
-    background: white;
-    border: 2px solid #ddd;
+    background: #000000;
+    border: 2px solid #ffffff;
     border-radius: 8px;
     padding: 15px;
     cursor: pointer;
@@ -215,13 +215,13 @@ body {
 
 .upgrade-name {
     font-weight: bold;
-    color: #333;
+    color: #ffffff;
     margin-bottom: 5px;
 }
 
 .upgrade-description {
     font-size: 0.85em;
-    color: #666;
+    color: #daffff;
     margin-bottom: 10px;
 }
 
