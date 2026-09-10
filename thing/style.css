@@ -1,0 +1,200 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #333;
+}
+
+.container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 1200px;
+    width: 95%;
+    padding: 30px;
+    max-height: 95vh;
+    overflow-y: auto;
+}
+
+#ui-container {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    gap: 20px;
+    z-index: 100;
+    flex-wrap: wrap;
+}
+
+#stats {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 8px;
+    border: 2px solid #4CAF50;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 200px;
+}
+
+#stats div {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+#score {
+    color: #4CAF50;
+}
+
+#bosses {
+    color: #FF9800;
+}
+
+#health {
+    color: #00fa53;
+}
+
+#stun-timer {
+    color: #2196F3;
+    display: none;
+}
+
+#abilities-container {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 8px;
+    border: 2px solid #2196F3;
+    max-width: 400px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#abilities-container h3 {
+    margin-bottom: 10px;
+    color: #2196F3;
+    font-size: 14px;
+}
+
+#abilities-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ability-badge {
+    background-color: #2196F3;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    border: 1px solid #1976D2;
+}
+
+.ability-badge.double-damage {
+    background-color: #f44336;
+}
+
+.ability-badge.less-stun {
+    background-color: #2196F3;
+}
+
+.ability-badge.explosion {
+    background-color: #FF9800;
+}
+
+.ability-badge.beam {
+    background-color: #4CAF50;
+}
+
+.ability-badge.upheaval {
+    background-color: #FFFFFF;
+}
+
+.ability-badge.explosive-strike {
+    background-color: #FF5722;
+}
+
+.ability-badge.heal {
+    background-color: #4CAF50;
+}
+
+#game-over {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+#game-over.hidden {
+    display: none;
+}
+
+.upgrade-count {
+    background: #667eea;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 0.85em;
+}
+
+.prestige-info {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#game-over-content p {
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: #4CAF50;
+}
+
+#game-over-content button {
+    padding: 15px 30px;
+    font-size: 18px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#game-over-content button:hover {
+    background-color: #45a049;
+}
+
+.enemy-indicator {
+    position: absolute;
+    background-color: rgba(255, 0, 0, 0.3);
+    border: 2px solid #f44336;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: pulse 0.5s infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+    }
+    to {
+        box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
+    }
+}
