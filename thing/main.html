@@ -3,30 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prototype</title>
+    <title>Clicker Simulator</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="ui-container">
-        <div id="stats">
-            <div id="score">Eliminations: 0</div>
-            <div id="bosses">Bosses Defeated: 0</div>
-            <div id="health">Health: 100</div>
-            <div id="stun-timer"></div>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>⚔️ Clicker Simulator ⚔️</h1>
+            <div class="stats">
+                <div class="stat">
+                    <span class="label">Gold:</span>
+                    <span class="value" id="goldDisplay">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Damage:</span>
+                    <span class="value" id="damageDisplay">1</span>
+                </div>
+                <div class="stat">
+                    <span class="label">DPS:</span>
+                    <span class="value" id="dpsDisplay">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Prestige Level:</span>
+                    <span class="value" id="prestigeLevelDisplay">0</span>
+                </div>
+            </div>
         </div>
-        <div id="abilities-container">
-            <h3>Your Abilities</h3>
-            <div id="abilities-list"></div>
+
+        <!-- Main Game Area -->
+        <div class="game-area">
+            <!-- Boss -->
+            <div class="boss-container">
+                <canvas id="bossCanvas" width="300" height="300"></canvas>
+                <div class="boss-hp">
+                    <div class="hp-bar-bg">
+                        <div class="hp-bar-fill" id="hpBar"></div>
+                    </div>
+                    <span id="hpText">100 / 100 HP</span>
+                </div>
+            </div>
+
+            <!-- Damage Popup Container -->
+            <div id="popupContainer"></div>
         </div>
-        <div id="game-over" class="hidden">
-            <div id="game-over-content">
-                <h1>GAME OVER</h1>
-                <p id="final-score"></p>
-                <button onclick="location.reload()">Play Again</button>
+
+        <!-- Upgrades Section -->
+        <div class="upgrades-section">
+            <div class="upgrade-panel">
+                <h2>Upgrades</h2>
+                <div class="upgrades-grid" id="upgradesGrid">
+                    <!-- Upgrades will be generated here -->
+                </div>
+            </div>
+
+            <!-- Prestige Section -->
+            <div class="prestige-panel">
+                <h2>Prestige</h2>
+                <div class="prestige-info">
+                    <p id="prestigeInfo">Reset your progress to gain prestige bonuses!</p>
+                    <button id="prestigeBtn" class="btn prestige-btn">
+                        <span id="prestigeBtnText">Prestige (0 Available)</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-    <canvas id="gameCanvas"></canvas>
+
     <script src="script.js"></script>
 </body>
 </html>

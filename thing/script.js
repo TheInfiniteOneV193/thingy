@@ -1,714 +1,380 @@
-// Game constants
-const CANVAS = document.getElementById('gameCanvas');
-const CTX = CANVAS.getContext('2d');
-const PADDING = 50;
-const ARENA_WIDTH = CANVAS.width = window.innerWidth;
-const ARENA_HEIGHT = CANVAS.height = window.innerHeight;
-
-// Game state
+// Game State
 const gameState = {
-    score: 0,
-    bossesDefeated: 0,
-    playerHealth: 100,
-    maxPlayerHealth: 100,
-    isStunned: false,
-    stunTimeRemaining: 0,
-    playerAbilities: [],
-    enemies: [],
-    projectiles: [],
-    explosions: [],
-    enemiesKilledSinceLastBoss: 0,
+    gold: 0,
+    baseDamage: 1,
+    totalDamage: 1,
+    damageMultiplier: 1,
+    bossMaxHP: 100,
+    bossHP: 100,
+    autoClickerActive: false,
+    autoClickerDPS: 0,
+    specialAbilitiesActive: {},
+    prestige: 0,
+    prestigeMultiplier: 1,
+    upgrades: {
+        damageBoost: 0,
+        autoClicker: 0,
+        superClick: 0,
+        lifeSteal: 0,
+        criticalStrike: 0,
+    },
+    criticalChance: 0.05,
 };
 
-// Enemy abilities
-const ENEMY_ABILITIES = {
-    FLASH_STEP: 'flash_step',
-    TANK: 'tank',
-    PROJECTILE: 'projectile',
-    SECOND_WIND: 'second_wind',
-    EXPLODER: 'exploder'
+// Upgrade Definitions
+const upgrades = {
+    damageBoost: {
+        name: 'Damage Boost',
+        icon: '⚡',
+        description: 'Increase damage per click by 5',
+        baseCost: 20,
+        effect: () => {
+            gameState.totalDamage = gameState.baseDamage * gameState.damageMultiplier;
+        },
+    },
+    autoClicker: {
+        name: 'Auto Clicker',
+        icon: '🤖',
+        description: 'Deal 1 DPS automatically',
+        baseCost: 100,
+        effect: () => {
+            updateAutoClickerDPS();
+        },
+    },
+    superClick: {
+        name: 'Super Click',
+        icon: '💥',
+        description: 'Click deals 2x damage next time',
+        baseCost: 150,
+        effect: () => {
+            gameState.damageMultiplier += 0.5;
+            gameState.totalDamage = gameState.baseDamage * gameState.damageMultiplier;
+        },
+    },
+    lifeSteal: {
+        name: 'Life Steal',
+        icon: '🩸',
+        description: '10% of damage heals the boss (opposite effect)',
+        baseCost: 200,
+        effect: () => {
+            // This upgrade modifies damage dealt
+        },
+    },
+    criticalStrike: {
+        name: 'Critical Strike',
+        icon: '🎯',
+        description: '5% chance for 2x damage',
+        baseCost: 250,
+        effect: () => {
+            gameState.criticalChance = 0.05 + (0.02 * gameState.upgrades.criticalStrike);
+        },
+    },
 };
 
-// Player abilities
-const PLAYER_ABILITIES = {
-    DOUBLE_DAMAGE: 'double_damage',
-    LESS_STUN: 'less_stun',
-    EXPLOSION: 'explosion',
-    BEAM: 'beam',
-    UPHEAVAL: 'upheaval',
-    EXPLOSIVE_STRIKE: 'explosive_strike',
-    HEAL: 'heal'
-};
+// Canvas Setup
+const canvas = document.getElementById('bossCanvas');
+const ctx = canvas.getContext('2d');
 
-class Enemy {
-    constructor(x, y, isBoss = false) {
-        this.x = x;
-        this.y = y;
-        this.isBoss = isBoss;
-        this.radius = isBoss ? 40 : 30;
-        this.vx = (Math.random() - 0.5) * 4;
-        this.vy = (Math.random() - 0.5) * 4;
-        this.color = isBoss ? '#FF6B00' : this.getRandomColor();
-        this.maxHealth = isBoss ? 50 : 3;
-        this.health = this.maxHealth;
-        this.flashStepCount = 0;
-        
-        // Random ability (30% chance for normal enemies, 50% for boss)
-        const abilityChance = isBoss ? 0.5 : 0.3;
-        if (Math.random() < abilityChance) {
-            const abilities = Object.values(ENEMY_ABILITIES);
-            this.ability = abilities[Math.floor(Math.random() * abilities.length)];
-        } else {
-            this.ability = null;
-        }
+// Event Listeners
+canvas.addEventListener('click', handleBossClick);
+document.getElementById('prestigeBtn').addEventListener('click', handlePrestige);
 
-        // For projectile ability
-        this.shootCooldown = 0;
-        this.hasSecondWind = this.ability === ENEMY_ABILITIES.SECOND_WIND;
-        
-        // For exploder ability
-        this.explodeCooldown = 0;
-        this.baseSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-    }
+// Draw Boss
+function drawBoss() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    getRandomColor() {
-        const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
-        return colors[Math.floor(Math.random() * colors.length)];
-    }
+    // Boss body (purple circle)
+    ctx.fillStyle = '#8B008B';
+    ctx.beginPath();
+    ctx.arc(150, 150, 60, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#4B0082';
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
-    update() {
-        // Movement
-        this.x += this.vx;
-        this.y += this.vy;
+    // Boss eyes
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(130, 130, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(170, 130, 12, 0, Math.PI * 2);
+    ctx.fill();
 
-        // Bounce off walls
-        if (this.x - this.radius < PADDING) {
-            this.x = PADDING + this.radius;
-            this.vx = Math.abs(this.vx);
-        }
-        if (this.x + this.radius > ARENA_WIDTH - PADDING) {
-            this.x = ARENA_WIDTH - PADDING - this.radius;
-            this.vx = -Math.abs(this.vx);
-        }
-        if (this.y - this.radius < PADDING) {
-            this.y = PADDING + this.radius;
-            this.vy = Math.abs(this.vy);
-        }
-        if (this.y + this.radius > ARENA_HEIGHT - PADDING) {
-            this.y = ARENA_HEIGHT - PADDING - this.radius;
-            this.vy = -Math.abs(this.vy);
-        }
+    // Boss pupils (animated based on damage taken)
+    const pupilShift = (gameState.bossMaxHP - gameState.bossHP) / gameState.bossMaxHP * 5;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(130 + pupilShift, 130, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(170 + pupilShift, 130, 6, 0, Math.PI * 2);
+    ctx.fill();
 
-        // Projectile ability shooting
-        if (this.ability === ENEMY_ABILITIES.PROJECTILE) {
-            this.shootCooldown--;
-            if (this.shootCooldown <= 0) {
-                this.shootProjectile();
-                this.shootCooldown = 120; // Shoot every 2 seconds
-            }
-        }
+    // Boss mouth (angry expression)
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(150, 160, 20, 0, Math.PI);
+    ctx.stroke();
 
-        // Exploder ability
-        if (this.ability === ENEMY_ABILITIES.EXPLODER) {
-            this.explodeCooldown--;
-            if (this.explodeCooldown <= 0) {
-                this.explode();
-                this.explodeCooldown = 180; // Explode every 3 seconds
-            }
-        }
-    }
+    // Boss horns
+    ctx.strokeStyle = '#FF6347';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(110, 90);
+    ctx.lineTo(95, 60);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(190, 90);
+    ctx.lineTo(205, 60);
+    ctx.stroke();
 
-    shootProjectile() {
-        const angle = Math.random() * Math.PI * 2;
-        gameState.projectiles.push(new EnemyProjectile(this.x, this.y, angle));
-    }
+    // Health bar indicator on boss
+    const healthPercentage = gameState.bossHP / gameState.bossMaxHP;
+    ctx.fillStyle = healthPercentage > 0.5 ? '#00FF00' : healthPercentage > 0.25 ? '#FFD700' : '#FF6347';
+    ctx.fillRect(120, 220, 60 * healthPercentage, 15);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(120, 220, 60, 15);
+}
 
-    draw() {
-        // Draw circle
-        CTX.fillStyle = this.color;
-        CTX.beginPath();
-        CTX.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        CTX.fill();
+// Handle Boss Click
+function handleBossClick(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-        // Draw health bar
-        if (this.health < this.maxHealth) {
-            const barWidth = this.radius * 2;
-            const barHeight = 4;
-            CTX.fillStyle = '#333';
-            CTX.fillRect(this.x - barWidth / 2, this.y - this.radius - 10, barWidth, barHeight);
-            CTX.fillStyle = '#4CAF50';
-            CTX.fillRect(this.x - barWidth / 2, this.y - this.radius - 10, (barWidth * this.health) / this.maxHealth, barHeight);
-        }
+    // Check if clicked on boss (within radius of ~60)
+    const dx = x - 150;
+    const dy = y - 150;
+    const distance = Math.sqrt(dx * dx + dy * dy);
 
-        // Draw ability icon
-        if (this.ability) {
-            this.drawAbilityIcon();
-        }
-
-        // Draw boss indicator
-        if (this.isBoss) {
-            CTX.strokeStyle = '#FFD700';
-            CTX.lineWidth = 3;
-            CTX.beginPath();
-            CTX.arc(this.x, this.y, this.radius + 8, 0, Math.PI * 2);
-            CTX.stroke();
-        }
-    }
-
-    drawAbilityIcon() {
-        CTX.save();
-        CTX.fillStyle = '#000000';
-        CTX.font = 'bold 10px Arial';
-        CTX.textAlign = 'center';
-        CTX.textBaseline = 'middle';
-
-        let text = '';
-        switch (this.ability) {
-            case ENEMY_ABILITIES.FLASH_STEP: text = 'FLASH'; break;
-            case ENEMY_ABILITIES.TANK: text = 'TANK'; break;
-            case ENEMY_ABILITIES.PROJECTILE: text = 'PROJ'; break;
-            case ENEMY_ABILITIES.SECOND_WIND: text = 'WIND'; break;
-            case ENEMY_ABILITIES.EXPLODER: text = 'BOOM'; break;
-        }
-
-        CTX.fillText(text, this.x, this.y);
-        CTX.restore();
-    }
-
-    onHit() {
-        this.health--;
-
-        if (this.health <= 0) {
-            if (this.ability === ENEMY_ABILITIES.FLASH_STEP) {
-                this.flashStepCount++;
-                if (this.flashStepCount < 3) {
-                    this.flashStep();
-                    this.health = this.maxHealth;
-                    return false;
-                } else {
-                    return true; // Flash step used 3 times, enemy is dead
-                }
-            } else if (this.ability === ENEMY_ABILITIES.SECOND_WIND && this.hasSecondWind) {
-                this.health = this.maxHealth;
-                this.hasSecondWind = false;
-                // Increase speed on second life
-                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                const newSpeed = speed * 1.5;
-                const angle = Math.atan2(this.vy, this.vx);
-                this.vx = Math.cos(angle) * newSpeed;
-                this.vy = Math.sin(angle) * newSpeed;
-                return false;
-            } else {
-                return true; // Enemy is dead
-            }
-        }
-
-        return false; // Enemy is still alive
-    }
-
-    flashStep() {
-        // Teleport to random location
-        this.x = PADDING + this.radius + Math.random() * (ARENA_WIDTH - 2 * PADDING - 2 * this.radius);
-        this.y = PADDING + this.radius + Math.random() * (ARENA_HEIGHT - 2 * PADDING - 2 * this.radius);
-    }
-
-    explode() {
-        // Create explosion that damages player if they're in range
-        const explosionRadius = 80;
-        gameState.explosions.push(new EnemyExplosion(this.x, this.y, explosionRadius));
+    if (distance < 60) {
+        dealDamage();
     }
 }
 
-class EnemyProjectile {
-    constructor(x, y, angle) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-        this.speed = 3;
-        this.vx = Math.cos(angle) * this.speed;
-        this.vy = Math.sin(angle) * this.speed;
-        this.radius = 5;
+// Deal Damage
+function dealDamage() {
+    let damage = gameState.totalDamage;
+
+    // Critical strike check
+    if (Math.random() < gameState.criticalChance) {
+        damage *= 2;
+        showDamagePopup('CRIT!', '#FF00FF');
     }
 
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
+    gameState.bossHP -= damage;
+    gameState.gold += Math.floor(damage);
+
+    // Life steal (heals boss - opposite effect, funny mechanic)
+    if (gameState.upgrades.lifeSteal > 0) {
+        gameState.bossHP += Math.floor(damage * 0.1 * gameState.upgrades.lifeSteal);
     }
 
-    draw() {
-        CTX.fillStyle = '#FF4444';
-        CTX.beginPath();
-        CTX.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        CTX.fill();
+    if (gameState.bossHP <= 0) {
+        defeatedBoss();
     }
 
-    isOutOfBounds() {
-        return this.x < 0 || this.x > ARENA_WIDTH || this.y < 0 || this.y > ARENA_HEIGHT;
-    }
+    updateUI();
+    saveGame();
+    drawBoss();
+    showDamagePopup(damage.toFixed(0), '#FF4444');
 }
 
-class PlayerProjectile {
-    constructor(x, y, angle) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-        this.speed = 6;
-        this.vx = Math.cos(angle) * this.speed;
-        this.vy = Math.sin(angle) * this.speed;
-        this.radius = 4;
-    }
-
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-    }
-
-    draw() {
-        CTX.fillStyle = '#4CAF50';
-        CTX.beginPath();
-        CTX.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        CTX.fill();
-    }
-
-    isOutOfBounds() {
-        return this.x < 0 || this.x > ARENA_WIDTH || this.y < 0 || this.y > ARENA_HEIGHT;
-    }
+// Defeated Boss
+function defeatedBoss() {
+    gameState.gold += Math.floor(gameState.bossMaxHP * 10 * gameState.prestigeMultiplier);
+    gameState.bossHP = gameState.bossMaxHP;
+    updateUI();
+    saveGame();
+    drawBoss();
+    alert('Boss defeated! You earned bonus gold!');
 }
 
-class Explosion {
-    constructor(x, y, radius = 40) {
-        this.x = x;
-        this.y = y;
-        this.maxRadius = radius;
-        this.currentRadius = 0;
-        this.duration = 20;
-        this.timeLeft = 20;
-    }
+// Show Damage Popup
+function showDamagePopup(text, color = '#FF4444') {
+    const popup = document.createElement('div');
+    popup.className = 'damage-popup';
+    popup.textContent = text;
+    popup.style.color = color;
+    popup.style.left = Math.random() * 100 - 50 + 'px';
 
-    update() {
-        this.timeLeft--;
-        this.currentRadius = (this.maxRadius * (this.duration - this.timeLeft)) / this.duration;
-    }
+    const container = document.getElementById('popupContainer');
+    container.appendChild(popup);
 
-    draw() {
-        CTX.fillStyle = `rgba(255, 165, 0, ${(this.timeLeft / this.duration) * 0.7})`;
-        CTX.beginPath();
-        CTX.arc(this.x, this.y, this.currentRadius, 0, Math.PI * 2);
-        CTX.fill();
-
-        CTX.strokeStyle = `rgba(255, 100, 0, ${(this.timeLeft / this.duration) * 0.9})`;
-        CTX.lineWidth = 2;
-        CTX.beginPath();
-        CTX.arc(this.x, this.y, this.currentRadius, 0, Math.PI * 2);
-        CTX.stroke();
-    }
-
-    isActive() {
-        return this.timeLeft > 0;
-    }
+    setTimeout(() => popup.remove(), 1000);
 }
 
-class EnemyExplosion extends Explosion {
-    constructor(x, y, radius = 80) {
-        super(x, y, radius);
-        this.isEnemyExplosion = true;
+// Update Auto Clicker DPS
+function updateAutoClickerDPS() {
+    gameState.autoClickerDPS = gameState.upgrades.autoClicker * 1 * gameState.prestigeMultiplier;
+    gameState.autoClickerActive = gameState.upgrades.autoClicker > 0;
+}
+
+// Auto Clicker Loop
+function autoClickerLoop() {
+    if (gameState.autoClickerActive && gameState.autoClickerDPS > 0) {
+        const damagePerFrame = gameState.autoClickerDPS / 60; // 60 FPS
+        gameState.bossHP -= damagePerFrame;
+        gameState.gold += damagePerFrame;
+
+        if (gameState.bossHP <= 0) {
+            defeatedBoss();
+        }
+
+        updateUI();
+        drawBoss();
     }
 
-    draw() {
-        CTX.fillStyle = `rgba(255, 100, 0, ${(this.timeLeft / this.duration) * 0.7})`;
-        CTX.beginPath();
-        CTX.arc(this.x, this.y, this.currentRadius, 0, Math.PI * 2);
-        CTX.fill();
-
-        CTX.strokeStyle = `rgba(255, 50, 0, ${(this.timeLeft / this.duration) * 0.9})`;
-        CTX.lineWidth = 2;
-        CTX.beginPath();
-        CTX.arc(this.x, this.y, this.currentRadius, 0, Math.PI * 2);
-        CTX.stroke();
-    }
+    requestAnimationFrame(autoClickerLoop);
 }
 
-function getPlayerPosition() {
-    return { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT / 2 };
-}
-
-function spawnEnemy(isBoss = false) {
-    let x, y, distance;
-    const minDistance = 150;
-    const playerPos = getPlayerPosition();
-
-    do {
-        x = PADDING + Math.random() * (ARENA_WIDTH - 2 * PADDING);
-        y = PADDING + Math.random() * (ARENA_HEIGHT - 2 * PADDING);
-        distance = Math.sqrt((x - playerPos.x) ** 2 + (y - playerPos.y) ** 2);
-    } while (distance < minDistance);
-
-    const enemy = new Enemy(x, y, isBoss);
-    gameState.enemies.push(enemy);
-}
-
-function spawnBoss() {
-    spawnEnemy(true);
-}
-
+// Update UI
 function updateUI() {
-    document.getElementById('score').textContent = `Eliminations: ${gameState.score}`;
-    document.getElementById('bosses').textContent = `Bosses Defeated: ${gameState.bossesDefeated}`;
-    document.getElementById('health').textContent = `Health: ${gameState.playerHealth}/${gameState.maxPlayerHealth}`;
+    document.getElementById('goldDisplay').textContent = Math.floor(gameState.gold);
+    document.getElementById('damageDisplay').textContent = gameState.totalDamage.toFixed(1);
+    document.getElementById('dpsDisplay').textContent = gameState.autoClickerDPS.toFixed(1);
+    document.getElementById('prestigeLevelDisplay').textContent = gameState.prestige;
 
-    if (gameState.isStunned) {
-        const stunDisplay = document.getElementById('stun-timer');
-        stunDisplay.style.display = 'block';
-        stunDisplay.textContent = `Stunned: ${Math.ceil(gameState.stunTimeRemaining / 60)}s`;
-    } else {
-        document.getElementById('stun-timer').style.display = 'none';
-    }
+    // Update HP Bar
+    const hpPercentage = (gameState.bossHP / gameState.bossMaxHP) * 100;
+    document.getElementById('hpBar').style.width = Math.max(0, hpPercentage) + '%';
+    document.getElementById('hpText').textContent = `${Math.max(0, Math.floor(gameState.bossHP))} / ${gameState.bossMaxHP} HP`;
 
-    // Update abilities list
-    const abilitiesList = document.getElementById('abilities-list');
-    abilitiesList.innerHTML = '';
-    gameState.playerAbilities.forEach(ability => {
-        const badge = document.createElement('div');
-        badge.className = `ability-badge ${ability}`;
-        badge.textContent = getAbilityDisplayName(ability);
-        abilitiesList.appendChild(badge);
-    });
+    // Update Upgrades Display
+    updateUpgradesDisplay();
+
+    // Update Prestige Button
+    const prestigeGain = calculatePrestigeGain();
+    const prestigeBtn = document.getElementById('prestigeBtn');
+    const prestigeBtnText = document.getElementById('prestigeBtnText');
+    prestigeBtnText.textContent = `Prestige (${prestigeGain} Available)`;
+    prestigeBtn.disabled = prestigeGain === 0;
 }
 
-function getAbilityDisplayName(ability) {
-    const names = {
-        double_damage: 'Double Damage',
-        less_stun: 'Less Stun',
-        explosion: 'Explosion',
-        beam: 'Beam',
-        upheaval: 'Upheaval',
-        explosive_strike: 'Explosive Strike',
-        heal: 'Heal'
-    };
-    return names[ability] || ability;
+// Calculate Prestige Gain
+function calculatePrestigeGain() {
+    return Math.floor(Math.sqrt(gameState.gold / 1000));
 }
 
-function grantRandomAbility() {
-    const availableAbilities = Object.values(PLAYER_ABILITIES);
-    const ability = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
-    gameState.playerAbilities.push(ability);
-}
+// Handle Prestige
+function handlePrestige() {
+    const prestigeGain = calculatePrestigeGain();
+    if (prestigeGain > 0) {
+        gameState.prestige += prestigeGain;
+        gameState.prestigeMultiplier = 1 + (gameState.prestige * 0.1); // 10% per prestige level
 
-function onEnemyClicked(enemy) {
-    if (gameState.isStunned) return;
+        // Reset game
+        gameState.gold = 0;
+        gameState.baseDamage = 1;
+        gameState.totalDamage = 1;
+        gameState.damageMultiplier = 1;
+        gameState.bossHP = gameState.bossMaxHP;
+        gameState.autoClickerDPS = 0;
+        gameState.autoClickerActive = false;
+        gameState.upgrades = {
+            damageBoost: 0,
+            autoClicker: 0,
+            superClick: 0,
+            lifeSteal: 0,
+            criticalStrike: 0,
+        };
 
-    let damage = 1;
-    if (gameState.playerAbilities.includes(PLAYER_ABILITIES.DOUBLE_DAMAGE)) {
-        damage = 2;
-    }
-
-    const isDead = enemy.onHit();
-
-    if (damage > 1 || gameState.playerAbilities.includes(PLAYER_ABILITIES.EXPLOSION)) {
-        if (!isDead && gameState.playerAbilities.includes(PLAYER_ABILITIES.EXPLOSION)) {
-            gameState.explosions.push(new Explosion(enemy.x, enemy.y, 60));
-            checkExplosionCollisions(enemy.x, enemy.y, 60);
-        }
-    }
-
-    if (gameState.playerAbilities.includes(PLAYER_ABILITIES.EXPLOSIVE_STRIKE)) {
-        gameState.explosions.push(new Explosion(enemy.x, enemy.y, 40));
-        checkExplosionCollisions(enemy.x, enemy.y, 40);
-    }
-
-    if (isDead) {
-        gameState.score++;
-        gameState.enemiesKilledSinceLastBoss++;
-
-        if (gameState.enemiesKilledSinceLastBoss >= 20) {
-            gameState.enemiesKilledSinceLastBoss = 0;
-            gameState.bossesDefeated++;
-            grantRandomAbility();
-        }
-
-        // Remove enemy from array
-        gameState.enemies = gameState.enemies.filter(e => e !== enemy);
+        updateUI();
+        saveGame();
+        drawBoss();
+        alert(`Prestiged! Gained ${prestigeGain} prestige levels. You now have a ${(gameState.prestigeMultiplier * 100 - 100).toFixed(0)}% damage & DPS boost!`);
     }
 }
 
-function checkExplosionCollisions(centerX, centerY, radius) {
-    gameState.enemies.forEach(enemy => {
-        const dist = Math.sqrt((enemy.x - centerX) ** 2 + (enemy.y - centerY) ** 2);
-        if (dist < radius + enemy.radius) {
-            if (enemy.onHit() === true) {
-                gameState.score++;
-                gameState.enemiesKilledSinceLastBoss++;
-                if (gameState.enemiesKilledSinceLastBoss >= 20) {
-                    gameState.enemiesKilledSinceLastBoss = 0;
-                    gameState.bossesDefeated++;
-                    grantRandomAbility();
-                }
-                gameState.enemies = gameState.enemies.filter(e => e !== enemy);
-            }
-        }
-    });
-}
+// Update Upgrades Display
+function updateUpgradesDisplay() {
+    const upgradesGrid = document.getElementById('upgradesGrid');
+    upgradesGrid.innerHTML = '';
 
-function handleCanvasClick(event) {
-    if (gameState.isStunned) return;
+    for (const [key, upgrade] of Object.entries(upgrades)) {
+        const count = gameState.upgrades[key] || 0;
+        const baseCost = upgrade.baseCost;
+        const currentCost = Math.floor(baseCost * Math.pow(1.15, count));
+        const canAfford = gameState.gold >= currentCost;
 
-    const rect = CANVAS.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
+        const upgradeElement = document.createElement('div');
+        upgradeElement.className = `upgrade ${!canAfford ? 'disabled' : ''}`;
+        upgradeElement.innerHTML = `
+            <div class="upgrade-icon">${upgrade.icon}</div>
+            <div class="upgrade-name">${upgrade.name}</div>
+            <div class="upgrade-description">${upgrade.description}</div>
+            <div class="upgrade-cost">
+                <span class="gold">💰 ${currentCost}</span>
+                <span class="upgrade-count">${count}</span>
+            </div>
+        `;
 
-    // Check for heal ability
-    if (gameState.playerAbilities.includes(PLAYER_ABILITIES.HEAL)) {
-        gameState.playerHealth = gameState.maxPlayerHealth;
-        // Remove heal ability after use
-        const healIndex = gameState.playerAbilities.indexOf(PLAYER_ABILITIES.HEAL);
-        if (healIndex > -1) {
-            gameState.playerAbilities.splice(healIndex, 1);
-        }
-        return;
-    }
-
-    // Check for beam or upheaval abilities
-    if (gameState.playerAbilities.includes(PLAYER_ABILITIES.BEAM)) {
-        fireBeam(clickX, clickY);
-    }
-
-    // Check for enemy hit
-    for (let enemy of gameState.enemies) {
-        const dist = Math.sqrt((enemy.x - clickX) ** 2 + (enemy.y - clickY) ** 2);
-        if (dist < enemy.radius) {
-            onEnemyClicked(enemy);
-            return;
-        }
-    }
-}
-
-function fireBeam(targetX, targetY) {
-    const playerPos = getPlayerPosition();
-    const angle = Math.atan2(targetY - playerPos.y, targetX - playerPos.x);
-    gameState.projectiles.push(new PlayerProjectile(playerPos.x, playerPos.y, angle));
-}
-
-function updateProjectiles() {
-    gameState.projectiles.forEach(proj => proj.update());
-    gameState.projectiles = gameState.projectiles.filter(proj => !proj.isOutOfBounds());
-
-    // Check collisions with enemies
-    gameState.projectiles.forEach((proj, projIndex) => {
-        gameState.enemies.forEach((enemy, enemyIndex) => {
-            const dist = Math.sqrt((enemy.x - proj.x) ** 2 + (enemy.y - proj.y) ** 2);
-            if (dist < enemy.radius + proj.radius) {
-                const isDead = enemy.onHit();
-                gameState.projectiles.splice(projIndex, 1);
-
-                if (isDead) {
-                    gameState.score++;
-                    gameState.enemiesKilledSinceLastBoss++;
-                    if (gameState.enemiesKilledSinceLastBoss >= 20) {
-                        gameState.enemiesKilledSinceLastBoss = 0;
-                        gameState.bossesDefeated++;
-                        grantRandomAbility();
-                    }
-                    gameState.enemies.splice(enemyIndex, 1);
-                }
+        upgradeElement.addEventListener('click', () => {
+            if (canAfford) {
+                purchaseUpgrade(key, currentCost);
             }
         });
-    });
+
+        upgradesGrid.appendChild(upgradeElement);
+    }
 }
 
-function updateEnemyProjectiles() {
-    gameState.projectiles.forEach(proj => {
-        if (proj instanceof EnemyProjectile) proj.update();
-    });
+// Purchase Upgrade
+function purchaseUpgrade(upgradeKey, cost) {
+    if (gameState.gold >= cost) {
+        gameState.gold -= cost;
+        gameState.upgrades[upgradeKey]++;
 
-    // Remove out of bounds
-    gameState.projectiles = gameState.projectiles.filter(proj => {
-        if (proj instanceof EnemyProjectile && proj.isOutOfBounds()) {
-            return false;
+        switch (upgradeKey) {
+            case 'damageBoost':
+                gameState.baseDamage += 5;
+                gameState.totalDamage = gameState.baseDamage * gameState.damageMultiplier;
+                break;
+            case 'autoClicker':
+                updateAutoClickerDPS();
+                break;
+            case 'superClick':
+                gameState.damageMultiplier += 0.5;
+                gameState.totalDamage = gameState.baseDamage * gameState.damageMultiplier;
+                break;
+            case 'criticalStrike':
+                gameState.criticalChance = Math.min(0.5, 0.05 + (0.02 * gameState.upgrades.criticalStrike));
+                break;
         }
-        return true;
-    });
 
-    // Check collisions with player
-    const playerPos = getPlayerPosition();
-    const playerRadius = 20;
-
-    gameState.projectiles.forEach((proj, projIndex) => {
-        if (proj instanceof EnemyProjectile) {
-            const dist = Math.sqrt((playerPos.x - proj.x) ** 2 + (playerPos.y - proj.y) ** 2);
-            if (dist < playerRadius + proj.radius) {
-                gameState.projectiles.splice(projIndex, 1);
-                applyProjectileDamage();
-            }
-        }
-    });
-}
-
-function applyProjectileDamage() {
-    let damage = 10;
-    gameState.playerHealth -= damage;
-    if (gameState.playerHealth <= 0) {
-        gameState.playerHealth = 0;
+        upgrades[upgradeKey].effect();
+        updateUI();
+        saveGame();
+        drawBoss();
     }
 }
 
-function updateStun() {
-    if (gameState.isStunned) {
-        gameState.stunTimeRemaining--;
-        if (gameState.stunTimeRemaining <= 0) {
-            gameState.isStunned = false;
-        }
+// Save Game
+function saveGame() {
+    localStorage.setItem('clickerGameState', JSON.stringify(gameState));
+}
+
+// Load Game
+function loadGame() {
+    const saved = localStorage.getItem('clickerGameState');
+    if (saved) {
+        const loadedState = JSON.parse(saved);
+        Object.assign(gameState, loadedState);
+        updateAutoClickerDPS();
     }
 }
 
-function drawPlayer() {
-    const playerPos = getPlayerPosition();
-    const playerRadius = 20;
-
-    CTX.fillStyle = '#4CAF50';
-    CTX.beginPath();
-    CTX.arc(playerPos.x, playerPos.y, playerRadius, 0, Math.PI * 2);
-    CTX.fill();
-
-    CTX.strokeStyle = '#2E7D32';
-    CTX.lineWidth = 3;
-    CTX.beginPath();
-    CTX.arc(playerPos.x, playerPos.y, playerRadius, 0, Math.PI * 2);
-    CTX.stroke();
-
-    // Draw health bar above player
-    const healthBarWidth = 60;
-    const healthBarHeight = 8;
-    const healthBarX = playerPos.x - healthBarWidth / 2;
-    const healthBarY = playerPos.y - playerRadius - 20;
-
-    CTX.fillStyle = '#333';
-    CTX.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-
-    const healthPercent = gameState.playerHealth / gameState.maxPlayerHealth;
-    CTX.fillStyle = healthPercent > 0.5 ? '#4CAF50' : (healthPercent > 0.25 ? '#FFC107' : '#f44336');
-    CTX.fillRect(healthBarX, healthBarY, healthBarWidth * healthPercent, healthBarHeight);
-
-    CTX.strokeStyle = '#FFF';
-    CTX.lineWidth = 1;
-    CTX.strokeRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
-}
-
-function drawArena() {
-    CTX.strokeStyle = '#4CAF50';
-    CTX.lineWidth = 3;
-    CTX.strokeRect(PADDING, PADDING, ARENA_WIDTH - 2 * PADDING, ARENA_HEIGHT - 2 * PADDING);
-}
-
-function checkEnemyExplosionCollisions() {
-    const playerPos = getPlayerPosition();
-    const playerRadius = 20;
-
-    gameState.explosions.forEach(exp => {
-        if (exp.isEnemyExplosion) {
-            const dist = Math.sqrt((playerPos.x - exp.x) ** 2 + (playerPos.y - exp.y) ** 2);
-            if (dist < exp.currentRadius + playerRadius) {
-                // Player hit by enemy explosion - apply stun
-                applyEnemyExplosionStun();
-            }
-        }
-    });
-}
-
-function applyEnemyExplosionStun() {
-    let stunDuration = 180; // 3 seconds at 60 FPS
-    if (gameState.playerAbilities.includes(PLAYER_ABILITIES.LESS_STUN)) {
-        stunDuration = 90; // 1.5 seconds
-    }
-
-    gameState.isStunned = true;
-    gameState.stunTimeRemaining = stunDuration;
-}
-
-function gameOver() {
-    document.getElementById('game-over').classList.remove('hidden');
-    document.getElementById('final-score').textContent = `Final Score: ${gameState.score} eliminations\nBosses Defeated: ${gameState.bossesDefeated}`;
-}
-
-function update() {
-    // Update enemies
-    gameState.enemies.forEach(enemy => enemy.update());
-
-    // Update stun
-    updateStun();
-
-    // Update projectiles
-    updateProjectiles();
-    updateEnemyProjectiles();
-
-    // Update explosions
-    gameState.explosions.forEach(exp => exp.update());
-    gameState.explosions = gameState.explosions.filter(exp => exp.isActive());
-
-    // Check enemy explosion collisions
-    checkEnemyExplosionCollisions();
-
-    // Spawn new enemies
-    if (gameState.enemies.length < 3 + Math.floor(gameState.score / 10)) {
-        spawnEnemy();
-    }
-
-    // Check for game over
-    if (gameState.playerHealth <= 0) {
-        return false; // Stop game loop
-    }
-
-    return true;
-}
-
-function draw() {
-    // Clear canvas
-    CTX.fillStyle = '#0d0d0d';
-    CTX.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT);
-
-    // Draw arena
-    drawArena();
-
-    // Draw explosions
-    gameState.explosions.forEach(exp => exp.draw());
-
-    // Draw enemies
-    gameState.enemies.forEach(enemy => enemy.draw());
-
-    // Draw projectiles
-    gameState.projectiles.forEach(proj => proj.draw());
-
-    // Draw player
-    drawPlayer();
-
-    // Update UI
+// Initialize Game
+function initGame() {
+    loadGame();
+    drawBoss();
     updateUI();
+    autoClickerLoop();
+    saveGame(); // Save initial state
 }
 
-let gameLoopRunning = true;
-
-function gameLoop() {
-    if (!update()) {
-        gameOver();
-        gameLoopRunning = false;
-        return;
-    }
-
-    draw();
-
-    if (gameLoopRunning) {
-        requestAnimationFrame(gameLoop);
-    }
-}
-
-// Event listeners
-CANVAS.addEventListener('click', handleCanvasClick);
-
-window.addEventListener('resize', () => {
-    CANVAS.width = window.innerWidth;
-    CANVAS.height = window.innerHeight;
-});
-
-// Start the game
-spawnEnemy();
-spawnEnemy();
-gameLoop();
+// Initialize on page load
+initGame();
